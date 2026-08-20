@@ -1,0 +1,1752 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KCP 탄소정책 확산 의사결정 대시보드</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<style>
+  :root {
+    --bg:#f3f6fb;
+    --panel:#ffffff;
+    --text:#172033;
+    --muted:#6f7a90;
+    --line:#e4e9f2;
+    --primary:#3d5fb8;
+    --primary-soft:#eaf0ff;
+    --candidate:#e88a3d;
+    --candidate-soft:#fff2e7;
+    --existing:#2c76d2;
+    --green:#248a65;
+    --green-soft:#e9f7f1;
+    --red:#d95858;
+    --shadow:0 14px 34px rgba(30,48,86,.08);
+    --radius:22px;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0;
+    font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", system-ui, -apple-system, sans-serif;
+    color:var(--text);
+    background:var(--bg);
+  }
+  button, select { font:inherit; }
+  .app { max-width:1480px; margin:auto; padding:28px; }
+  .topbar {
+    display:flex; align-items:center; justify-content:space-between; gap:18px;
+    background:#18233c; color:white; border-radius:24px; padding:22px 26px;
+    box-shadow:var(--shadow); margin-bottom:22px;
+  }
+  .brand { display:flex; gap:14px; align-items:center; }
+  .logo {
+    width:46px; height:46px; border-radius:14px; display:grid; place-items:center;
+    background:linear-gradient(145deg,#5e7ce7,#2a9b78); font-weight:900;
+  }
+  .brand h1 { font-size:21px; margin:0 0 4px; letter-spacing:-.02em; }
+  .brand p { margin:0; color:#bac5da; font-size:13px; }
+  .policy-chip {
+    background:rgba(255,255,255,.11); border:1px solid rgba(255,255,255,.13);
+    padding:11px 14px; border-radius:14px; font-size:13px; white-space:nowrap;
+  }
+  .hero {
+    display:grid; grid-template-columns:1.25fr .75fr; gap:18px; margin-bottom:18px;
+  }
+  .hero-card {
+    border-radius:var(--radius); background:linear-gradient(135deg,#fdfefe 0%,#edf2ff 100%);
+    border:1px solid var(--line); padding:26px; box-shadow:var(--shadow);
+  }
+  .eyebrow { color:var(--primary); font-size:12px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+  .hero h2 { margin:8px 0 10px; font-size:28px; letter-spacing:-.04em; }
+  .hero p { margin:0; color:var(--muted); line-height:1.7; }
+  .goal-list { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+  .goal { background:white; border:1px solid var(--line); padding:8px 11px; border-radius:999px; font-size:12px; }
+  .source-card {
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:22px; box-shadow:var(--shadow);
+  }
+  .source-card h3 { margin:0 0 14px; font-size:15px; }
+  .source-row { display:flex; justify-content:space-between; gap:16px; padding:10px 0; border-top:1px solid var(--line); font-size:13px; }
+  .source-row:first-of-type { border-top:0; }
+  .source-row span { color:var(--muted); }
+  .source-row b { text-align:right; }
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px; }
+  .kpi {
+    background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:20px;
+    box-shadow:0 8px 22px rgba(30,48,86,.05);
+  }
+  .kpi .label { color:var(--muted); font-size:12px; font-weight:700; }
+  .kpi .value { font-size:29px; font-weight:900; margin:8px 0 5px; letter-spacing:-.04em; }
+  .kpi .sub { color:var(--muted); font-size:12px; }
+  .grid-main { display:grid; grid-template-columns:1.45fr .65fr; gap:18px; margin-bottom:18px; }
+  .panel {
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); overflow:hidden;
+  }
+  .panel-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; padding:22px 22px 0; }
+  .panel-head h3 { margin:0 0 5px; font-size:17px; }
+  .panel-head p { margin:0; color:var(--muted); font-size:12px; line-height:1.5; }
+  .legend { display:flex; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--muted); }
+  .legend span { display:flex; gap:6px; align-items:center; }
+  .dot { width:9px; height:9px; border-radius:50%; display:inline-block; }
+  .map-wrap { position:relative; min-height:530px; padding:10px 22px 24px; }
+  .map-frame {
+    position:relative; height:455px; border-radius:18px; overflow:hidden;
+    background:linear-gradient(180deg,#edf5ff 0%,#f9fbfd 100%);
+    border:1px solid #e3ebf4;
+  }
+  .sea-label { position:absolute; color:#b4c2d5; font-size:11px; letter-spacing:.12em; }
+  .sea-left { left:12%; top:43%; } .sea-right { right:9%; top:40%; }
+  .korea {
+    position:absolute; width:41%; height:86%; left:31%; top:6%;
+    filter:drop-shadow(0 10px 16px rgba(61,95,184,.10));
+  }
+  .map-marker {
+    position:absolute; transform:translate(-50%,-50%); cursor:pointer; z-index:4;
+    border:0; background:transparent; padding:0; text-align:center;
+  }
+  .marker-core {
+    width:25px; height:25px; border-radius:50%; border:4px solid white;
+    background:var(--candidate); box-shadow:0 4px 12px rgba(21,33,62,.22);
+    display:grid; place-items:center; color:white; font-size:10px; font-weight:900;
+    transition:.18s ease;
+  }
+  .map-marker:hover .marker-core, .map-marker.active .marker-core { transform:scale(1.22); }
+  .map-marker.rank1 .marker-core { width:33px; height:33px; background:var(--red); }
+  .map-marker.top3 .marker-core { background:#d96f3f; }
+  .marker-label {
+    margin-top:4px; background:rgba(255,255,255,.94); border:1px solid var(--line);
+    border-radius:8px; padding:3px 6px; font-size:10px; font-weight:800;
+    white-space:nowrap; box-shadow:0 3px 10px rgba(30,48,86,.08);
+  }
+  .map-note {
+    position:absolute; left:38px; bottom:38px; background:rgba(255,255,255,.94);
+    border:1px solid var(--line); border-radius:12px; padding:10px 12px; font-size:10px; color:var(--muted);
+    max-width:260px;
+  }
+  .existing-body { padding:18px 22px 24px; }
+  .empty-state {
+    border:1px dashed #c9d4e5; background:#f8faff; border-radius:16px; padding:20px;
+    margin-bottom:14px;
+  }
+  .empty-icon { width:42px; height:42px; border-radius:13px; background:var(--primary-soft); color:var(--primary); display:grid; place-items:center; font-size:20px; margin-bottom:12px; }
+  .empty-state h4 { margin:0 0 7px; font-size:14px; }
+  .empty-state p { margin:0; color:var(--muted); font-size:12px; line-height:1.65; }
+  .data-tag { display:inline-flex; align-items:center; gap:7px; margin-top:12px; padding:7px 9px; border-radius:10px; background:#fff4dd; color:#92631a; font-size:11px; font-weight:700; }
+  .mini-card { border:1px solid var(--line); border-radius:14px; padding:14px; margin-top:10px; }
+  .mini-card .mini-title { color:var(--muted); font-size:11px; }
+  .mini-card .mini-value { font-size:17px; font-weight:900; margin-top:4px; }
+  .scenario-panel { margin-bottom:18px; }
+  .scenario-controls {
+    padding:18px 22px 0; display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap;
+  }
+  .tabs { display:flex; gap:8px; flex-wrap:wrap; }
+  .tab {
+    border:1px solid var(--line); background:white; color:var(--muted); border-radius:12px;
+    padding:10px 13px; cursor:pointer; font-size:12px; font-weight:800;
+  }
+  .tab.active { border-color:var(--primary); color:var(--primary); background:var(--primary-soft); }
+  .weights { display:flex; flex-wrap:wrap; gap:7px; }
+  .weight {
+    background:#f6f8fc; border:1px solid var(--line); border-radius:10px; padding:7px 9px; font-size:11px;
+  }
+  .table-wrap { overflow:auto; padding:14px 22px 22px; }
+  table { border-collapse:separate; border-spacing:0; width:100%; min-width:960px; }
+  th { text-align:left; color:var(--muted); font-size:11px; padding:11px 12px; background:#f8faff; border-bottom:1px solid var(--line); }
+  td { padding:13px 12px; border-bottom:1px solid var(--line); font-size:12px; }
+  tbody tr { cursor:pointer; transition:.12s; }
+  tbody tr:hover { background:#fafcff; }
+  .rank {
+    width:30px; height:30px; border-radius:10px; display:grid; place-items:center;
+    background:#f1f4f8; font-weight:900;
+  }
+  tr[data-rank="1"] .rank { background:#ffe9e5; color:var(--red); }
+  tr[data-rank="2"] .rank, tr[data-rank="3"] .rank { background:var(--candidate-soft); color:#b9652b; }
+  .scorebar { display:flex; align-items:center; gap:8px; min-width:120px; }
+  .bar { width:72px; height:7px; border-radius:999px; background:#edf1f6; overflow:hidden; }
+  .bar > i { display:block; height:100%; background:var(--primary); border-radius:999px; }
+  .up { color:var(--red); font-weight:800; } .down { color:var(--green); font-weight:800; }
+  .stable { color:var(--green); font-weight:800; }
+  .advice-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:18px; }
+  .advice-card {
+    background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:20px;
+    box-shadow:0 8px 22px rgba(30,48,86,.05); cursor:pointer; transition:.18s ease;
+  }
+  .advice-card.active { border-color:var(--primary); box-shadow:0 10px 26px rgba(61,95,184,.13); }
+  .advice-card .badge { display:inline-block; background:var(--primary-soft); color:var(--primary); border-radius:8px; padding:5px 8px; font-size:10px; font-weight:900; }
+  .advice-card h4 { margin:11px 0 8px; font-size:15px; }
+  .advice-card p { margin:0; color:var(--muted); line-height:1.68; font-size:12px; }
+  .detail {
+    position:fixed; inset:0; pointer-events:none; z-index:20;
+  }
+  .backdrop { position:absolute; inset:0; background:rgba(17,28,49,.28); opacity:0; transition:.2s; }
+  .drawer {
+    position:absolute; right:0; top:0; height:100%; width:min(430px,92vw); background:white;
+    transform:translateX(102%); transition:.22s ease; padding:28px; overflow:auto; box-shadow:-20px 0 55px rgba(24,36,63,.18);
+  }
+  .detail.open { pointer-events:auto; } .detail.open .backdrop { opacity:1; } .detail.open .drawer { transform:translateX(0); }
+  .close { border:0; background:#f2f5fa; border-radius:10px; width:36px; height:36px; cursor:pointer; float:right; }
+  .drawer h3 { margin:8px 0 5px; font-size:24px; }
+  .drawer .subtitle { color:var(--muted); font-size:12px; }
+  .drawer-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:20px; }
+  .drawer-stat { border:1px solid var(--line); border-radius:14px; padding:14px; }
+  .drawer-stat span { display:block; color:var(--muted); font-size:10px; margin-bottom:5px; }
+  .drawer-stat b { font-size:16px; }
+  .drawer-section { margin-top:22px; }
+  .drawer-section h4 { margin:0 0 10px; font-size:13px; }
+  .rankline { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-top:1px solid var(--line); font-size:12px; }
+  .rankline:first-of-type { border-top:0; }
+  .footer-note {
+    color:var(--muted); font-size:11px; line-height:1.7; background:#eef2f8;
+    border-radius:14px; padding:14px 16px; margin-bottom:10px;
+  }
+  @media(max-width:1000px) {
+    .hero,.grid-main { grid-template-columns:1fr; }
+    .kpis,.advice-grid { grid-template-columns:1fr 1fr; }
+    .map-wrap { min-height:480px; }
+  }
+  @media(max-width:650px) {
+    .app { padding:14px; }
+    .topbar { align-items:flex-start; flex-direction:column; }
+    .hero h2 { font-size:23px; }
+    .kpis,.advice-grid { grid-template-columns:1fr; }
+    .korea { width:54%; left:24%; }
+    .panel-head { flex-direction:column; }
+  }
+
+  .map-tabs {
+    display:flex; gap:8px; padding:16px 22px 0; flex-wrap:wrap;
+  }
+  .map-tab {
+    border:1px solid var(--line); background:#fff; color:var(--muted);
+    border-radius:11px; padding:9px 12px; font-size:12px; font-weight:800;
+    cursor:pointer;
+  }
+  .map-tab.active {
+    background:var(--primary-soft); color:var(--primary); border-color:var(--primary);
+  }
+  .map-pane { display:none; padding:12px 22px 24px; }
+  .map-pane.active { display:block; }
+  #realMap {
+    height:505px;
+    border-radius:18px;
+    border:1px solid #dfe7f0;
+    overflow:hidden;
+    background:#eef3f8;
+  }
+  .leaflet-container {
+    font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+  }
+  .candidate-pin {
+    width:34px; height:34px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--candidate); color:white; border:4px solid white;
+    box-shadow:0 4px 14px rgba(20,35,60,.28);
+    font-size:11px; font-weight:900;
+  }
+  .candidate-pin.top3 { background:#d96f3f; }
+  .candidate-pin.rank1 {
+    background:var(--red);
+    width:42px; height:42px; font-size:13px;
+  }
+  .existing-pin {
+    width:34px; height:34px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--existing); color:white; border:4px solid white;
+    box-shadow:0 4px 14px rgba(20,35,60,.28);
+    font-size:11px; font-weight:900;
+  }
+  .leaflet-div-icon { background:transparent; border:0; }
+  .popup-title { font-weight:900; font-size:14px; margin-bottom:5px; }
+  .popup-sub { color:#6f7a90; font-size:11px; margin-bottom:7px; }
+  .popup-row { display:flex; justify-content:space-between; gap:14px; font-size:11px; padding:3px 0; }
+  .popup-action {
+    display:block; margin-top:9px; text-align:center; text-decoration:none;
+    background:#edf2ff; color:#3d5fb8; border-radius:8px; padding:7px 8px;
+    font-size:11px; font-weight:900;
+  }
+  .map-source-note {
+    display:flex; justify-content:space-between; align-items:center; gap:14px;
+    margin-top:10px; padding:10px 12px; border-radius:12px; background:#f8faff;
+    border:1px solid var(--line); color:var(--muted); font-size:10px; line-height:1.55;
+  }
+  .map-source-note a {
+    color:var(--primary); font-weight:800; text-decoration:none; white-space:nowrap;
+  }
+  .kcp-frame-wrap {
+    min-height:505px; border:1px solid #dfe7f0; border-radius:18px; overflow:hidden;
+    background:#f7f9fc; position:relative;
+  }
+  .kcp-frame {
+    width:100%; height:505px; border:0; background:white;
+  }
+  .kcp-fallback {
+    position:absolute; right:16px; top:16px; z-index:2;
+    background:#18233c; color:white; text-decoration:none;
+    padding:9px 12px; border-radius:10px; font-size:11px; font-weight:900;
+    box-shadow:0 5px 16px rgba(0,0,0,.15);
+  }
+  .kcp-frame-note {
+    color:var(--muted); font-size:10px; line-height:1.6; margin-top:10px;
+  }
+
+
+  .candidate-form {
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:14px;
+    background:#f8faff;
+    margin-bottom:14px;
+  }
+  .candidate-form label {
+    display:block;
+    font-size:11px;
+    font-weight:900;
+    margin-bottom:8px;
+  }
+  .candidate-input-row { display:flex; gap:7px; }
+  .candidate-input {
+    flex:1; min-width:0; border:1px solid #ccd6e5; border-radius:11px;
+    padding:10px 11px; outline:none; background:#fff; color:var(--text);
+  }
+  .candidate-input:focus {
+    border-color:var(--primary);
+    box-shadow:0 0 0 3px rgba(61,95,184,.10);
+  }
+  .candidate-btn {
+    border:0; background:var(--primary); color:#fff; border-radius:11px;
+    padding:10px 13px; cursor:pointer; font-weight:900; white-space:nowrap;
+  }
+  .candidate-help {
+    color:var(--muted); font-size:10px; line-height:1.55; margin-top:8px;
+  }
+  .candidate-status {
+    display:none; margin-top:9px; padding:8px 10px; border-radius:10px;
+    font-size:10px; line-height:1.5;
+  }
+  .candidate-status.show { display:block; }
+  .candidate-status.info { background:#edf2ff; color:#38549a; }
+  .candidate-status.error { background:#fff0f0; color:#ae4545; }
+  .candidate-status.success { background:#eaf7f1; color:#277454; }
+  .candidate-search-results {
+    display:none; margin-top:9px; border:1px solid var(--line);
+    border-radius:11px; background:#fff; overflow:hidden;
+  }
+  .candidate-search-results.show { display:block; }
+  .candidate-search-option {
+    display:block; width:100%; text-align:left; border:0;
+    border-top:1px solid var(--line); background:#fff; padding:10px 11px;
+    cursor:pointer; font-size:10px; color:var(--text); line-height:1.45;
+  }
+  .candidate-search-option:first-child { border-top:0; }
+  .candidate-search-option:hover { background:#f5f8fd; }
+  .kcp-entry {
+    display:none; margin-top:10px; border-top:1px solid var(--line); padding-top:12px;
+  }
+  .kcp-entry.show { display:block; }
+  .kcp-entry-title { font-size:11px; font-weight:900; margin-bottom:4px; }
+  .kcp-entry-desc { font-size:9px; color:var(--muted); line-height:1.5; margin-bottom:9px; }
+  .kcp-entry-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+  .kcp-field label { font-size:8px; color:var(--muted); margin-bottom:4px; font-weight:700; }
+  .kcp-field input {
+    width:100%; border:1px solid #d5dde9; border-radius:9px;
+    padding:8px 9px; font-size:10px; background:white;
+  }
+  .candidate-confirm-btn {
+    width:100%; margin-top:9px; border:0; background:#243a73; color:#fff;
+    border-radius:10px; padding:9px 10px; cursor:pointer; font-weight:900; font-size:10px;
+  }
+  .candidate-list { display:flex; flex-direction:column; gap:8px; max-height:475px; overflow:auto; }
+  .candidate-card {
+    border:1px solid var(--line); border-radius:13px; padding:11px; background:#fff;
+  }
+  .candidate-card-head {
+    display:flex; justify-content:space-between; gap:8px; align-items:flex-start;
+  }
+  .candidate-card-name { font-size:12px; font-weight:900; }
+  .candidate-card-parent { color:var(--muted); font-size:8px; margin-top:2px; line-height:1.35; }
+  .candidate-tag {
+    display:inline-block; margin-top:6px; padding:3px 6px; border-radius:999px;
+    background:#fff0e3; color:#b9652b; font-size:8px; font-weight:900;
+  }
+  .candidate-tag.user { background:#eaf0ff; color:#3d5fb8; }
+  .candidate-remove {
+    border:0; width:25px; height:25px; border-radius:8px; background:#f2f5f9;
+    cursor:pointer; color:#8a94a6;
+  }
+  .candidate-card-grid {
+    display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px;
+  }
+  .candidate-card-stat { background:#f8faff; border-radius:8px; padding:7px; }
+  .candidate-card-stat span { display:block; color:var(--muted); font-size:7px; margin-bottom:2px; }
+  .candidate-card-stat b { font-size:9px; }
+  .candidate-count-box {
+    margin-top:10px; padding:10px 11px; border-radius:11px; background:#edf2ff;
+    color:#38549a; font-size:10px; font-weight:900;
+  }
+
+
+  .policy-settings {
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:22px;
+    margin-bottom:18px;
+  }
+  .policy-settings-head {
+    display:flex;
+    justify-content:space-between;
+    gap:16px;
+    align-items:flex-start;
+    margin-bottom:18px;
+  }
+  .policy-settings-head h3 { margin:0 0 5px; font-size:17px; }
+  .policy-settings-head p { margin:0; color:var(--muted); font-size:11px; line-height:1.55; }
+  .policy-setting-grid {
+    display:grid;
+    grid-template-columns:1fr 1.15fr;
+    gap:16px;
+    margin-bottom:16px;
+  }
+  .setting-block {
+    border:1px solid var(--line);
+    border-radius:15px;
+    padding:14px;
+    background:#fbfcff;
+  }
+  .setting-label {
+    display:block;
+    font-size:10px;
+    color:var(--muted);
+    font-weight:900;
+    margin-bottom:7px;
+  }
+  .policy-name-input, .goal-input {
+    width:100%;
+    border:1px solid #ccd6e5;
+    border-radius:10px;
+    padding:10px 11px;
+    background:white;
+    color:var(--text);
+    outline:none;
+  }
+  .policy-name-input:focus, .goal-input:focus {
+    border-color:var(--primary);
+    box-shadow:0 0 0 3px rgba(61,95,184,.10);
+  }
+  .goal-input-row { display:flex; gap:7px; }
+  .goal-add-btn {
+    border:0;
+    border-radius:10px;
+    background:var(--primary);
+    color:white;
+    font-weight:900;
+    padding:9px 12px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .editable-goals {
+    display:flex;
+    flex-wrap:wrap;
+    gap:7px;
+    margin-top:10px;
+  }
+  .editable-goal {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    background:var(--primary-soft);
+    color:var(--primary);
+    border:1px solid #d7e2ff;
+    border-radius:999px;
+    padding:6px 8px 6px 10px;
+    font-size:9px;
+    font-weight:800;
+  }
+  .goal-remove {
+    width:17px; height:17px; border:0; border-radius:50%;
+    background:rgba(61,95,184,.12); color:var(--primary); cursor:pointer;
+    display:grid; place-items:center; padding:0; font-size:10px;
+  }
+  .kcp-selector-title {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-bottom:9px;
+  }
+  .kcp-selector-title span { font-size:10px; color:var(--muted); font-weight:900; }
+  .kcp-options {
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:9px;
+  }
+  .kcp-option {
+    border:1px solid var(--line);
+    border-radius:13px;
+    background:white;
+    padding:13px;
+    cursor:pointer;
+    text-align:left;
+    transition:.15s ease;
+    color:var(--text);
+  }
+  .kcp-option:hover { border-color:#aebfe1; transform:translateY(-1px); }
+  .kcp-option.active {
+    border-color:var(--primary);
+    background:var(--primary-soft);
+    box-shadow:0 0 0 2px rgba(61,95,184,.08);
+  }
+  .kcp-option-name {
+    display:block;
+    font-size:11px;
+    line-height:1.45;
+    font-weight:900;
+    margin-bottom:7px;
+  }
+  .kcp-option-meta {
+    display:flex;
+    align-items:center;
+    gap:5px;
+    color:var(--muted);
+    font-size:8px;
+  }
+  .connection-badge {
+    display:inline-block;
+    border-radius:999px;
+    padding:3px 6px;
+    font-size:7px;
+    font-weight:900;
+  }
+  .connection-badge.connected { background:#e8f6ef; color:#278061; }
+  .connection-badge.manual { background:#fff2e7; color:#a8632f; }
+  .indicator-notice {
+    margin-top:10px;
+    padding:9px 11px;
+    border-radius:10px;
+    background:#f6f8fc;
+    color:var(--muted);
+    font-size:9px;
+    line-height:1.55;
+  }
+  .empty-ranking {
+    text-align:center;
+    padding:30px 15px !important;
+    color:var(--muted);
+    line-height:1.65;
+    background:#fbfcff;
+  }
+  @media(max-width:850px) {
+    .policy-setting-grid { grid-template-columns:1fr; }
+    .kcp-options { grid-template-columns:1fr; }
+  }
+
+
+  .auto-kcp-card {
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:12px;
+    background:#fff;
+  }
+  .auto-kcp-loading {
+    display:flex;
+    align-items:center;
+    gap:8px;
+    color:var(--muted);
+    font-size:10px;
+  }
+  .spinner {
+    width:15px; height:15px; border:2px solid #dbe3ef;
+    border-top-color:var(--primary); border-radius:50%;
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .auto-kcp-success {
+    background:#eaf7f1;
+    border:1px solid #cdeadd;
+    border-radius:11px;
+    padding:10px;
+    color:#276d54;
+    font-size:10px;
+    line-height:1.55;
+    margin-bottom:9px;
+  }
+  .auto-kcp-error {
+    background:#fff0f0;
+    border:1px solid #f0d0d0;
+    border-radius:11px;
+    padding:10px;
+    color:#a64545;
+    font-size:10px;
+    line-height:1.55;
+  }
+  .auto-kcp-grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:7px;
+    margin-top:9px;
+  }
+  .auto-kcp-item {
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:8px;
+    background:#f8faff;
+  }
+  .auto-kcp-item span {
+    display:block;
+    font-size:8px;
+    color:var(--muted);
+    margin-bottom:3px;
+  }
+  .auto-kcp-item b {
+    display:block;
+    font-size:10px;
+    line-height:1.35;
+  }
+  .auto-kcp-source {
+    margin-top:8px;
+    color:var(--muted);
+    font-size:8px;
+    line-height:1.5;
+  }
+
+
+  .candidate-delete-btn {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:5px;
+    border:1px solid #f0c8c8;
+    background:#fff4f4;
+    color:#b54a4a;
+    border-radius:9px;
+    padding:6px 9px;
+    cursor:pointer;
+    font-size:9px;
+    font-weight:900;
+    white-space:nowrap;
+    transition:.15s ease;
+  }
+  .candidate-delete-btn:hover {
+    background:#ffe8e8;
+    border-color:#e7a7a7;
+    transform:translateY(-1px);
+  }
+  .candidate-delete-note {
+    margin-top:7px;
+    color:var(--muted);
+    font-size:8px;
+    line-height:1.45;
+  }
+
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">KCP</div>
+      <div>
+        <h1>탄소정책 확산 의사결정 대시보드</h1>
+        <p>지역별 KCP 데이터와 시나리오 기반 정책 확대 우선순위</p>
+      </div>
+    </div>
+    <div class="policy-chip" id="policyChip">선택 정책 · 스마트 생태공장 구축사업</div>
+  </header>
+
+  <section class="policy-settings">
+    <div class="policy-settings-head">
+      <div>
+        <h3>정책 설정</h3>
+        <p>정책명·정책 목표·분석에 사용할 KCP 지표를 직접 설정할 수 있습니다.</p>
+      </div>
+    </div>
+
+    <div class="policy-setting-grid">
+      <div class="setting-block">
+        <label class="setting-label" for="policyNameInput">정책명</label>
+        <input
+          id="policyNameInput"
+          class="policy-name-input"
+          type="text"
+          value="스마트 생태공장 구축사업"
+          placeholder="정책명을 입력하세요"
+          oninput="updatePolicyName(this.value)"
+        >
+      </div>
+
+      <div class="setting-block">
+        <label class="setting-label" for="policyGoalInput">정책의 목표</label>
+        <div class="goal-input-row">
+          <input
+            id="policyGoalInput"
+            class="goal-input"
+            type="text"
+            placeholder="추가할 정책 목표를 입력하세요"
+            onkeydown="if(event.key==='Enter'){event.preventDefault(); addPolicyGoal();}"
+          >
+          <button class="goal-add-btn" onclick="addPolicyGoal()">목표 추가</button>
+        </div>
+        <div class="editable-goals" id="editableGoalList"></div>
+      </div>
+    </div>
+
+    <div class="setting-block">
+      <div class="kcp-selector-title">
+        <span>KCP 지표 선택</span>
+        <span id="selectedIndicatorShort"></span>
+      </div>
+      <div class="kcp-options" id="kcpIndicatorOptions"></div>
+      <div class="indicator-notice" id="indicatorNotice"></div>
+    </div>
+  </section>
+
+  <section class="hero">
+    <div class="hero-card">
+      <div class="eyebrow">Policy Decision Support</div>
+      <h2 id="heroPolicyName">스마트 생태공장 구축사업</h2>
+      <p id="heroPolicyDescription">설정한 정책 목표와 KCP 지표를 바탕으로 동·읍·면 단위 정책 확대 우선순위를 비교합니다.</p>
+      <div class="goal-list" id="heroGoalList"></div>
+    </div>
+    <div class="source-card">
+      <h3>분석 데이터</h3>
+      <div class="source-row"><span>KCP 지표</span><b id="sourceKcpIndicator">에너지 제조업 및 건설업 탄소 배출량</b></div>
+      <div class="source-row"><span>후보 지역</span><b id="sourceCandidateCount">6개</b></div>
+      <div class="source-row"><span>데이터 상태</span><b id="sourceDataStatus">기본 KCP 데이터 연결</b></div>
+      <div class="source-row"><span>최신 관측</span><b id="sourceLatestObservation">2022년 12월</b></div>
+    </div>
+  </section>
+
+  <section class="kpis">
+    <div class="kpi"><div class="label">등록 후보지역</div><div class="value" id="candidateKpiCount">6</div><div class="sub">KCP 데이터와 지도에 연결된 후보</div></div>
+    <div class="kpi"><div class="label">KCP 데이터 연결</div><div class="value" id="kcpConnectedCount">6</div><div class="sub">배출수준·최근추세·반복증가 계산 가능 지역</div></div>
+    <div class="kpi"><div class="label">현재 선택 시나리오 1순위</div><div class="value" id="topRegion">성주동</div><div class="sub" id="topScore">균형형 · 89.81점</div></div>
+    <div class="kpi"><div class="label">1위 TOP3 유지율</div><div class="value" id="topStability">100%</div><div class="sub">±5%p 가중치 민감도 분석</div></div>
+  </section>
+
+  <section class="grid-main">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>국내 정책 확대 후보 지도</h3>
+          <p>실제 지도 좌표를 기반으로 후보 지역을 표시합니다. 시나리오를 바꾸면 마커의 순위도 함께 변경됩니다.</p>
+        </div>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--candidate)"></i>확대 후보</span>
+          <span><i class="dot" style="background:var(--red)"></i>현재 1순위</span>
+        </div>
+      </div>
+
+      <div class="map-tabs">
+        <button class="map-tab active" id="candidateMapTab" onclick="switchMapPane('candidate')">후보지역 지도</button>
+        <button class="map-tab" id="kcpMapTab" onclick="switchMapPane('kcp')">KCP 원본 비교지도</button>
+      </div>
+
+      <div class="map-pane active" id="candidateMapPane">
+        <div id="realMap"></div>
+        <div class="map-source-note">
+          <span>지도 바탕은 OpenStreetMap을 사용하며, 후보 지역은 동·읍 단위 실제 위치를 기준으로 표시했습니다. 지역명이 중복될 수 있어 상위 행정구역을 함께 표기합니다.</span>
+          <a href="https://korea-carbon-project.org/ko/comparison" target="_blank" rel="noopener">KCP 비교 페이지 ↗</a>
+        </div>
+      </div>
+
+      <div class="map-pane" id="kcpMapPane">
+        <div class="kcp-frame-wrap">
+          <a class="kcp-fallback" href="https://korea-carbon-project.org/ko/comparison" target="_blank" rel="noopener">새 창에서 KCP 열기 ↗</a>
+          <iframe
+            class="kcp-frame"
+            src="https://korea-carbon-project.org/ko/comparison"
+            title="KCP 지역별 탄소 비교 지도"
+            loading="lazy"
+            referrerpolicy="strict-origin-when-cross-origin">
+          </iframe>
+        </div>
+        <div class="kcp-frame-note">
+          KCP 사이트가 보안 설정(X-Frame-Options/CSP)으로 외부 사이트 내 삽입을 제한하는 경우 iframe이 표시되지 않을 수 있습니다. 그때는 우측 상단의 ‘새 창에서 KCP 열기’를 이용하면 됩니다.
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>후보 지역 현황</h3>
+          <p>동·읍·면 후보지를 확인하고 KCP 데이터를 연결해 추가합니다.</p>
+        </div>
+      </div>
+      <div class="existing-body">
+        <div class="candidate-form">
+          <label for="candidateRegionInput">후보지역 추가</label>
+          <div class="candidate-input-row">
+            <input
+              id="candidateRegionInput"
+              class="candidate-input"
+              type="text"
+              placeholder="예: 장항면, 오송읍"
+              autocomplete="off"
+              onkeydown="if(event.key==='Enter') searchCandidateRegion()"
+            >
+            <button class="candidate-btn" onclick="searchCandidateRegion()">지역 확인</button>
+          </div>
+          <div class="candidate-help">
+            동·읍·면을 검색해 실제 법정동을 선택하면 행정코드를 KCP API에 전달하고, 월별 배출량으로 v3 지표를 자동 계산해 후보에 추가합니다.
+          </div>
+          <div class="candidate-status" id="candidateStatus"></div>
+          <div class="candidate-search-results" id="candidateSearchResults"></div>
+
+          <div class="kcp-entry" id="kcpEntry">
+            <div class="kcp-entry-title" id="kcpEntryTitle">KCP 데이터 자동 조회</div>
+            <div class="kcp-entry-desc" id="kcpEntryDesc">
+              지역 확인이 끝나면 연결된 KCP 월별 데이터에서 해당 지역을 자동 검색하고,
+              탄소 v3의 계산식을 이용해 최근 12개월 평균배출량·Trend 기울기·YoY 증가월 비율을 바로 계산합니다.
+            </div>
+            <div id="autoKcpLookupResult"></div>
+          </div>
+        </div>
+
+        <div class="candidate-list" id="candidateRegionList"></div>
+        <div class="candidate-delete-note">
+          ※ 기본 KCP 후보는 유지되며, 사용자가 직접 추가한 후보지역만 ‘후보 삭제’ 버튼으로 제거할 수 있습니다.
+        </div>
+        <div class="candidate-count-box">
+          현재 분석 후보 <span id="candidateRegionCount">6</span>개
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <section class="panel scenario-panel">
+    <div class="panel-head">
+      <div><h3>정책 확대 후보 우선순위</h3><p>의사결정 목적에 맞는 시나리오를 선택하면 순위·점수·제언이 함께 변경됩니다.</p></div>
+    </div>
+    <div class="scenario-controls">
+      <div class="tabs" id="scenarioTabs"></div>
+      <div class="weights" id="weights"></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>순위</th><th>지역</th><th>시나리오 점수</th><th>최근 관측 배출량</th>
+            <th>최근 12개월 평균</th><th>최근 Trend 기울기</th><th>YoY 증가월 비율</th>
+            <th>민감도 순위범위</th><th>TOP3 유지율</th>
+          </tr>
+        </thead>
+        <tbody id="rankingBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div style="margin:0 0 10px 3px"><h3 style="margin:0;font-size:17px">시나리오별 정책 제언</h3><p style="margin:5px 0 0;color:var(--muted);font-size:12px">시나리오의 정책 목적과 v3 순위 결과를 함께 해석합니다.</p></div>
+    <div class="advice-grid" id="adviceGrid"></div>
+  </section>
+
+  <div class="footer-note">
+    <b>전국 후보 자동조회:</b> 후보지역 검색은 법정동 코드 목록을 사용하고,
+    KCP 월별 데이터는 서버에서 <code>https://api.korea-carbon-project.org/region/compare/monthly</code>
+    엔드포인트로 요청합니다. 현재 분석기간은 v3와 동일한 2020.01~2022.12입니다.
+    KCP 응답으로부터 최근 12개월 평균, STL Trend 기울기, YoY 증가월 비율을 계산합니다.
+  </div>
+  <div class="footer-note">
+    <b>KCP 지표 선택:</b> 현재 기본 6개 후보지역 원본이 연결된 지표는 ‘에너지 제조업 및 건설업 탄소 배출량’입니다.
+    농업·폐기물 지표를 선택하면 해당 KCP metric의 월별 데이터만 사용하여 서로 다른 지표의 데이터가 섞이지 않도록 구성했습니다.
+  </div>
+  <div class="footer-note">
+    <b>데이터 해석 주의:</b> 이 화면의 후보 순위와 민감도 결과는 ‘탄소 v3’의 세 지표(배출수준·최근추세·반복증가) 및 시나리오 가중치에 기반합니다.
+    기본 후보지역은 제공된 KCP Excel과 탄소 v3 결과를 사용합니다. 사용자가 추가하는 후보지역도 동일한 세 지표와 시나리오 가중치로 다시 정규화·순위화됩니다. 후보 지도는 실제 지형을 보여주기 위해 OpenStreetMap을 사용하고, KCP 원본 비교 페이지를 별도 탭으로 연결했습니다.
+  </div>
+</div>
+
+<div class="detail" id="detail">
+  <div class="backdrop" onclick="closeDetail()"></div>
+  <div class="drawer">
+    <button class="close" onclick="closeDetail()">✕</button>
+    <div class="eyebrow">Region Detail</div>
+    <h3 id="detailName">성주동</h3>
+    <div class="subtitle" id="detailParent">KCP 지역 상세 및 시나리오별 순위</div>
+    <div class="drawer-grid">
+      <div class="drawer-stat"><span>최근 관측 배출량</span><b id="dLatest"></b></div>
+      <div class="drawer-stat"><span>최근 12개월 평균</span><b id="dMean"></b></div>
+      <div class="drawer-stat"><span>최근 Trend 기울기</span><b id="dTrend"></b></div>
+      <div class="drawer-stat"><span>YoY 증가월 비율</span><b id="dRepeat"></b></div>
+    </div>
+    <div class="drawer-section">
+      <h4>시나리오별 순위</h4>
+      <div id="detailRanks"></div>
+    </div>
+    <div class="drawer-section">
+      <h4>해석</h4>
+      <p id="detailInterpret" style="font-size:12px;color:var(--muted);line-height:1.7"></p>
+    </div>
+  </div>
+</div>
+
+
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin="">
+</script>
+
+<script>
+const DATA = {"regions": [{"name": "갈산동", "latestEmission": 2598.607, "mean12": 1478.69, "trend": -8.68, "repeatIncrease": 25.0, "geo": {"lat": 35.8438406, "lng": 128.4981096, "parent": "대구광역시 달서구"}}, {"name": "남촌동", "latestEmission": 2166.936, "mean12": 1367.44, "trend": -7.63, "repeatIncrease": 50.0, "geo": {"lat": 37.43183, "lng": 126.7176901, "parent": "인천광역시 남동구"}}, {"name": "성주동", "latestEmission": 5674.105, "mean12": 5386.72, "trend": 107.45, "repeatIncrease": 91.67, "geo": {"lat": 35.1994206, "lng": 128.711644, "parent": "경상남도 창원시 성산구"}}, {"name": "오송읍", "latestEmission": 1944.059, "mean12": 2025.24, "trend": -61.84, "repeatIncrease": 25.0, "geo": {"lat": 36.6321656, "lng": 127.3251463, "parent": "충청북도 청주시 흥덕구"}}, {"name": "원시동", "latestEmission": 8061.754, "mean12": 9849.44, "trend": -86.66, "repeatIncrease": 41.67, "geo": {"lat": 37.3144347, "lng": 126.7972823, "parent": "경기도 안산시 단원구"}}, {"name": "향남읍", "latestEmission": 9609.433, "mean12": 4778.73, "trend": -18.62, "repeatIncrease": 16.67, "geo": {"lat": 37.1303417, "lng": 126.9044793, "parent": "경기도 화성시"}}], "scenarios": {"균형형": {"label": "균형형", "description": "현재 배출수준·최근추세·반복증가를 동일하게 고려", "weights": {"배출수준": 33.3, "최근추세": 33.3, "반복증가": 33.3}, "advice": "성주동은 모든 기준을 종합했을 때 1위이며, 민감도 분석에서도 1위를 안정적으로 유지합니다. 원시동은 배출규모가 매우 커 2순위로 유지되므로, 성주동을 최우선 검토하되 원시동을 병행 검토하는 전략이 적절합니다.", "rows": {"성주동": {"rank": 1, "score": 89.810152, "range": "1 ~ 1", "top3": 100.0}, "원시동": {"rank": 2, "score": 44.444444, "range": "2 ~ 2", "top3": 100.0}, "향남읍": {"rank": 3, "score": 32.80544, "range": "3 ~ 4", "top3": 77.78}, "남촌동": {"rank": 4, "score": 28.386096, "range": "3 ~ 4", "top3": 22.22}, "갈산동": {"rank": 5, "score": 18.413846, "range": "5 ~ 5", "top3": 0.0}, "오송읍": {"rank": 6, "score": 14.594885, "range": "6 ~ 6", "top3": 0.0}}}, "감축잠재량_중시형": {"label": "감축잠재량 중시형", "description": "현재 배출수준에 더 큰 비중을 두고 고배출 지역을 우선", "weights": {"배출수준": 50, "최근추세": 25, "반복증가": 25}, "advice": "성주동이 1순위이고 원시동이 2순위입니다. 원시동은 최근 추세가 감소 방향임에도 현재 배출수준이 매우 높아 이 시나리오에서 강한 우선순위를 보입니다. 단기간에 큰 절대 감축량을 목표로 할 경우 두 지역을 우선 검토하는 것이 합리적입니다.", "rows": {"성주동": {"rank": 1, "score": 84.715229, "range": "1 ~ 1", "top3": 100.0}, "원시동": {"rank": 2, "score": 58.333333, "range": "2 ~ 2", "top3": 100.0}, "향남읍": {"rank": 3, "score": 40.445137, "range": "3 ~ 3", "top3": 100.0}, "남촌동": {"rank": 4, "score": 21.289572, "range": "4 ~ 4", "top3": 0.0}, "오송읍": {"rank": 5, "score": 15.917559, "range": "5 ~ 6", "top3": 0.0}, "갈산동": {"rank": 6, "score": 14.800286, "range": "5 ~ 6", "top3": 0.0}}}, "선제대응형": {"label": "선제대응형", "description": "최근추세와 반복증가를 중시해 악화 신호가 큰 지역을 우선", "weights": {"배출수준": 20, "최근추세": 40, "반복증가": 40}, "advice": "성주동은 최근 Trend 기울기와 YoY 증가월 비율이 모두 가장 높아 압도적인 1순위입니다. 남촌동은 현재 배출수준은 낮지만 반복증가가 높아 2순위로 상승합니다. 조기 개입과 악화 방지가 목적이라면 성주동과 남촌동을 집중 검토할 수 있습니다.", "rows": {"성주동": {"rank": 1, "score": 93.886091, "range": "1 ~ 1", "top3": 100.0}, "남촌동": {"rank": 2, "score": 34.063315, "range": "2 ~ 3", "top3": 100.0}, "원시동": {"rank": 3, "score": 33.333333, "range": "2 ~ 3", "top3": 100.0}, "향남읍": {"rank": 4, "score": 26.693681, "range": "4 ~ 4", "top3": 0.0}, "갈산동": {"rank": 5, "score": 21.304695, "range": "5 ~ 5", "top3": 0.0}, "오송읍": {"rank": 6, "score": 13.536746, "range": "6 ~ 6", "top3": 0.0}}}}};
+let selectedScenario = "균형형";
+
+const nf = new Intl.NumberFormat("ko-KR", {maximumFractionDigits: 1});
+const regionMap = Object.fromEntries(DATA.regions.map(r => [r.name, r]));
+
+
+const POLICY_SETTINGS_KEY = "kcpPolicyDashboardSettingsV1";
+
+const KCP_INDICATORS = {
+  energy_manufacturing: {
+    label: "에너지 제조업 및 건설업 탄소 배출량",
+    fullLabel: "에너지 제조업 및 건설업 탄소 배출량 (tCO₂eq)",
+    short: "제조업·건설업",
+    baseConnected: true,
+    apiConnected: true,
+    kcpMetric: "en_fc_mc",
+    latestObservation: "KCP API · 2022년 12월"
+  },
+  agriculture: {
+    label: "농업 탄소 배출량",
+    fullLabel: "농업 탄소 배출량 (tCO₂eq)",
+    short: "농업",
+    baseConnected: false,
+    apiConnected: true,
+    kcpMetric: "agr_luu",
+    latestObservation: "KCP API · 2022년 12월"
+  },
+  waste: {
+    label: "폐기물 탄소 배출량",
+    fullLabel: "폐기물 탄소 배출량 (tCO₂eq)",
+    short: "폐기물",
+    baseConnected: false,
+    apiConnected: true,
+    kcpMetric: "wst_wiob",
+    latestObservation: "KCP API · 2022년 12월"
+  }
+};
+
+function loadPolicySettings() {
+  const defaults = {
+    name: "스마트 생태공장 구축사업",
+    goals: ["온실가스 저감", "에너지·자원 효율 제고"],
+    indicatorKey: "energy_manufacturing"
+  };
+
+  try {
+    const raw = localStorage.getItem(POLICY_SETTINGS_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    return {
+      name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name : defaults.name,
+      goals: Array.isArray(parsed.goals) ? parsed.goals : defaults.goals,
+      indicatorKey: KCP_INDICATORS[parsed.indicatorKey] ? parsed.indicatorKey : defaults.indicatorKey
+    };
+  } catch (e) {
+    return defaults;
+  }
+}
+
+let policySettings = loadPolicySettings();
+
+function savePolicySettings() {
+  try {
+    localStorage.setItem(POLICY_SETTINGS_KEY, JSON.stringify(policySettings));
+  } catch (e) {
+    console.warn("정책 설정 저장 실패", e);
+  }
+}
+
+function currentIndicator() {
+  return KCP_INDICATORS[policySettings.indicatorKey];
+}
+
+function updatePolicyName(value) {
+  policySettings.name = value.trim() || "정책명 미입력";
+  savePolicySettings();
+  renderPolicySettings(false);
+}
+
+function addPolicyGoal() {
+  const input = document.getElementById("policyGoalInput");
+  const goal = input.value.trim();
+
+  if (!goal) return;
+  if (policySettings.goals.includes(goal)) {
+    input.value = "";
+    return;
+  }
+
+  policySettings.goals.push(goal);
+  input.value = "";
+  savePolicySettings();
+  renderPolicySettings(false);
+}
+
+function removePolicyGoal(index) {
+  policySettings.goals.splice(index, 1);
+  savePolicySettings();
+  renderPolicySettings(false);
+}
+
+function selectKcpIndicator(key) {
+  if (!KCP_INDICATORS[key]) return;
+
+  policySettings.indicatorKey = key;
+  savePolicySettings();
+
+  renderPolicySettings(true);
+  renderCandidateRegions();
+  refreshDashboard();
+}
+
+function renderPolicySettings(syncNameInput=true) {
+  const indicator = currentIndicator();
+
+  if (syncNameInput) {
+    document.getElementById("policyNameInput").value =
+      policySettings.name === "정책명 미입력" ? "" : policySettings.name;
+  }
+
+  document.getElementById("policyChip").textContent =
+    `선택 정책 · ${policySettings.name}`;
+  document.getElementById("heroPolicyName").textContent =
+    policySettings.name;
+
+  const goalText = policySettings.goals.length
+    ? policySettings.goals.join(" · ")
+    : "정책 목표 미입력";
+
+  document.getElementById("heroPolicyDescription").textContent =
+    `${goalText}을(를) 목표로, ${indicator.label}을 활용해 동·읍·면 단위 정책 확대 우선순위를 비교합니다.`;
+
+  document.getElementById("editableGoalList").innerHTML =
+    policySettings.goals.length
+      ? policySettings.goals.map((goal, index) => `
+          <span class="editable-goal">
+            ${escapeHtml(goal)}
+            <button class="goal-remove" onclick="removePolicyGoal(${index})" title="목표 삭제">×</button>
+          </span>
+        `).join("")
+      : `<span style="font-size:9px;color:var(--muted)">등록된 정책 목표가 없습니다.</span>`;
+
+  document.getElementById("heroGoalList").innerHTML =
+    policySettings.goals.length
+      ? policySettings.goals.map(goal => `<span class="goal">${escapeHtml(goal)}</span>`).join("")
+      : `<span class="goal">정책 목표 미입력</span>`;
+
+  document.getElementById("kcpIndicatorOptions").innerHTML =
+    Object.entries(KCP_INDICATORS).map(([key, item]) => `
+      <button
+        class="kcp-option ${key === policySettings.indicatorKey ? "active" : ""}"
+        onclick="selectKcpIndicator('${key}')"
+      >
+        <span class="kcp-option-name">${item.label}</span>
+        <span class="kcp-option-meta">
+          <span class="connection-badge connected">
+            KCP API 자동 조회 · ${item.kcpMetric}
+          </span>
+        </span>
+      </button>
+    `).join("");
+
+  document.getElementById("selectedIndicatorShort").textContent =
+    `선택됨 · ${indicator.short}`;
+
+  document.getElementById("sourceKcpIndicator").textContent =
+    indicator.label;
+  document.getElementById("sourceLatestObservation").textContent =
+    indicator.latestObservation;
+
+  document.getElementById("sourceDataStatus").textContent =
+    `KCP API(${indicator.kcpMetric}) + v3 자동 계산`;
+
+  document.getElementById("indicatorNotice").textContent =
+    indicator.baseConnected
+      ? `기본 6개 후보는 기존 v3 결과를 표시하며, 새 후보는 KCP API의 ${indicator.kcpMetric} 월별 데이터를 자동 조회해 같은 v3 방식으로 계산합니다.`
+      : `새 후보지역을 선택하면 KCP API의 ${indicator.kcpMetric} 월별 데이터를 자동 조회해 최근 12개월 평균·Trend·YoY를 계산합니다.`;
+}
+
+const USER_CANDIDATE_KEY = "kcpUserCandidateRegionsV1";
+let userCandidates = loadUserCandidates();
+let pendingCandidateLocation = null;
+
+function loadUserCandidates() {
+  try {
+    const raw = localStorage.getItem(USER_CANDIDATE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveUserCandidates() {
+  try {
+    localStorage.setItem(USER_CANDIDATE_KEY, JSON.stringify(userCandidates));
+  } catch (e) {
+    console.warn("후보지역 저장 실패", e);
+  }
+}
+
+function allCandidates() {
+  const indicatorKey = policySettings.indicatorKey;
+
+  const base = indicatorKey === "energy_manufacturing"
+    ? DATA.regions.map(r => ({...r, source:"base", indicatorKey:"energy_manufacturing"}))
+    : [];
+
+  const users = userCandidates
+    .filter(r => (r.indicatorKey || "energy_manufacturing") === indicatorKey)
+    .map(r => ({...r, source:"user"}));
+
+  return [...base, ...users];
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function normalizeRegionName(name) {
+  return (name || "").trim().replace(/\s+/g, "");
+}
+
+function isValidDongEupMyeon(name) {
+  return /(?:동|읍|면)$/.test((name || "").trim());
+}
+
+function setCandidateStatus(message, type="info") {
+  const box = document.getElementById("candidateStatus");
+  box.className = `candidate-status show ${type}`;
+  box.textContent = message;
+}
+
+function clearCandidateResults() {
+  const box = document.getElementById("candidateSearchResults");
+  box.className = "candidate-search-results";
+  box.innerHTML = "";
+}
+
+function hideKcpEntry() {
+  document.getElementById("kcpEntry").className = "kcp-entry";
+  document.getElementById("autoKcpLookupResult").innerHTML = "";
+  pendingCandidateLocation = null;
+}
+
+async function searchCandidateRegion() {
+  const input = document.getElementById("candidateRegionInput");
+  const query = input.value.trim();
+
+  clearCandidateResults();
+  hideKcpEntry();
+
+  if (!query) {
+    setCandidateStatus("후보지역을 입력해 주세요.", "error");
+    return;
+  }
+
+  if (!isValidDongEupMyeon(query)) {
+    setCandidateStatus("후보지는 동·읍·면 단위로 입력해 주세요. 예: 향남읍, 오송읍, 장항면", "error");
+    return;
+  }
+
+  setCandidateStatus("전국 법정동 코드에서 실제 지역을 확인하고 있습니다…", "info");
+
+  try {
+    const response = await fetch(`/api/regions/search?q=${encodeURIComponent(query)}`);
+    const payload = await response.json();
+
+    if (!response.ok || !payload.ok) {
+      setCandidateStatus(payload.message || "지역 검색에 실패했습니다.", "error");
+      return;
+    }
+
+    const results = payload.results || [];
+    if (!results.length) {
+      setCandidateStatus("일치하는 현재 사용 중 동·읍·면을 찾지 못했습니다.", "error");
+      return;
+    }
+
+    if (results.length === 1) {
+      await chooseLegalRegion(results[0]);
+      return;
+    }
+
+    window._candidateSearchResults = results;
+    setCandidateStatus(
+      `동일하거나 유사한 지역 ${results.length}곳이 확인되었습니다. 실제 후보지역을 선택해 주세요.`,
+      "info"
+    );
+
+    const box = document.getElementById("candidateSearchResults");
+    box.className = "candidate-search-results show";
+    box.innerHTML = results.map((item, idx) => `
+      <button class="candidate-search-option" onclick="chooseCandidateResult(${idx})">
+        <b>${escapeHtml(item.name)}</b><br>
+        <span style="color:var(--muted)">${escapeHtml(item.fullName)}</span>
+      </button>
+    `).join("");
+
+  } catch (e) {
+    setCandidateStatus("지역 코드 검색 서버와 연결하지 못했습니다.", "error");
+  }
+}
+
+async function chooseCandidateResult(index) {
+  const item = (window._candidateSearchResults || [])[index];
+  if (!item) return;
+  await chooseLegalRegion(item);
+}
+
+async function geocodeLegalRegion(item) {
+  // 지도 표시용 좌표만 OpenStreetMap에서 가져온다.
+  // KCP 데이터 조회 자체는 아래 법정동 코드로 처리한다.
+  try {
+    const url =
+      "https://nominatim.openstreetmap.org/search" +
+      "?format=jsonv2&countrycodes=kr&limit=1&q=" +
+      encodeURIComponent(item.fullName);
+
+    const response = await fetch(url, {headers: {"Accept":"application/json"}});
+    if (!response.ok) throw new Error("geocode failed");
+
+    const rows = await response.json();
+    if (!rows.length) throw new Error("no coordinates");
+
+    return {
+      lat: Number(rows[0].lat),
+      lng: Number(rows[0].lon),
+      parent: item.fullName
+    };
+  } catch (e) {
+    // 좌표 조회가 실패해도 KCP 계산은 계속 가능하도록 null 좌표 허용.
+    return {
+      lat: null,
+      lng: null,
+      parent: item.fullName
+    };
+  }
+}
+
+async function chooseLegalRegion(item) {
+  clearCandidateResults();
+
+  const duplicateByCode = allCandidates().some(
+    r => r.legalCode && r.legalCode === item.code
+  );
+  if (duplicateByCode) {
+    setCandidateStatus("이미 후보지역에 등록되어 있습니다.", "info");
+    return;
+  }
+
+  const geo = await geocodeLegalRegion(item);
+
+  pendingCandidateLocation = {
+    name: item.name,
+    displayName: item.fullName,
+    fullName: item.fullName,
+    legalCode: item.code,
+    kcpCodes: item.kcpCodes,
+    geo
+  };
+
+  setCandidateStatus(
+    `${item.fullName} 확인 완료 · KCP ${currentIndicator().kcpMetric} 월별 데이터를 자동 조회합니다.`,
+    "success"
+  );
+
+  document.getElementById("kcpEntry").className = "kcp-entry show";
+  await lookupAndAddCandidateFromKcp();
+}
+
+async function lookupAndAddCandidateFromKcp() {
+  if (!pendingCandidateLocation) return;
+
+  const box = document.getElementById("autoKcpLookupResult");
+  box.innerHTML = `
+    <div class="auto-kcp-card">
+      <div class="auto-kcp-loading">
+        <span class="spinner"></span>
+        <span>KCP API 월별 데이터 조회 및 v3 지표 계산 중…</span>
+      </div>
+    </div>`;
+
+  const params = new URLSearchParams({
+    code: pendingCandidateLocation.legalCode,
+    indicator: policySettings.indicatorKey
+  });
+
+  try {
+    const response = await fetch(`/api/kcp/lookup?${params.toString()}`);
+    const payload = await response.json();
+
+    if (!response.ok || !payload.ok) {
+      box.innerHTML = `
+        <div class="auto-kcp-error">
+          ${escapeHtml(payload.message || "해당 지역의 KCP 월별 데이터를 찾지 못했습니다.")}
+        </div>`;
+      setCandidateStatus(
+        payload.message || "KCP 데이터 자동 조회에 실패했습니다.",
+        "error"
+      );
+      return;
+    }
+
+    const metrics = payload.metrics;
+
+    box.innerHTML = `
+      <div class="auto-kcp-success">
+        KCP 월별 데이터 ${payload.monthCount}개월을 확인했고,
+        탄소 v3와 동일한 방식으로 세 지표 계산을 완료했습니다.
+      </div>
+      <div class="auto-kcp-grid">
+        <div class="auto-kcp-item">
+          <span>최근 관측 배출량</span>
+          <b>${nf.format(metrics.latestEmission)} tCO₂eq</b>
+        </div>
+        <div class="auto-kcp-item">
+          <span>최근 12개월 평균배출량</span>
+          <b>${nf.format(metrics.mean12)} tCO₂eq</b>
+        </div>
+        <div class="auto-kcp-item">
+          <span>최근 12개월 Trend 기울기</span>
+          <b>${metrics.trend > 0 ? "+" : ""}${metrics.trend.toFixed(2)}</b>
+        </div>
+        <div class="auto-kcp-item">
+          <span>YoY 증가월 비율</span>
+          <b>${metrics.repeatIncrease.toFixed(2)}%</b>
+        </div>
+      </div>
+      <div class="auto-kcp-source">
+        KCP API · ${escapeHtml(payload.indicatorLabel)} · ${escapeHtml(payload.kcpMetric)}
+        · 최신 관측 ${escapeHtml(payload.latestObservation)}
+      </div>`;
+
+    const record = {
+      name: pendingCandidateLocation.name,
+      latestEmission: metrics.latestEmission,
+      mean12: metrics.mean12,
+      trend: metrics.trend,
+      repeatIncrease: metrics.repeatIncrease,
+      geo: pendingCandidateLocation.geo,
+      legalCode: pendingCandidateLocation.legalCode,
+      fullName: pendingCandidateLocation.fullName,
+      kcpCodes: pendingCandidateLocation.kcpCodes,
+      indicatorKey: policySettings.indicatorKey,
+      kcpMetric: currentIndicator().kcpMetric,
+      calculatedBy: "carbon-v3+kcp-api"
+    };
+
+    userCandidates.push(record);
+    saveUserCandidates();
+
+    document.getElementById("candidateRegionInput").value = "";
+    setCandidateStatus(
+      `${record.name}의 KCP 데이터와 v3 계산 지표가 자동 입력되어 후보지역에 추가되었습니다.`,
+      "success"
+    );
+
+    pendingCandidateLocation = null;
+    renderCandidateRegions();
+    refreshDashboard();
+
+  } catch (e) {
+    box.innerHTML = `
+      <div class="auto-kcp-error">
+        대시보드 서버 또는 KCP API에 연결하지 못했습니다.
+      </div>`;
+    setCandidateStatus("KCP 자동 조회 서버와 연결하지 못했습니다.", "error");
+  }
+}
+
+function removeUserCandidate(name) {
+  const indicatorLabel = currentIndicator().label;
+  const confirmed = window.confirm(
+    `${name}을(를) 현재 후보지역에서 삭제할까요?\n\n` +
+    `삭제하면 ${indicatorLabel} 기준 지도·우선순위·민감도·정책 제언에서도 즉시 제거됩니다.`
+  );
+
+  if (!confirmed) return;
+
+  userCandidates = userCandidates.filter(r =>
+    !(
+      r.name === name &&
+      (r.indicatorKey || "energy_manufacturing") === policySettings.indicatorKey
+    )
+  );
+
+  saveUserCandidates();
+  renderCandidateRegions();
+  refreshDashboard();
+
+  setCandidateStatus(
+    `${name}을(를) 후보지역에서 삭제했습니다. 우선순위를 다시 계산했습니다.`,
+    "success"
+  );
+}
+
+function renderCandidateRegions() {
+  const candidates = allCandidates();
+  const box = document.getElementById("candidateRegionList");
+
+  document.getElementById("candidateRegionCount").textContent = candidates.length;
+  document.getElementById("candidateKpiCount").textContent = candidates.length;
+  document.getElementById("kcpConnectedCount").textContent = candidates.length;
+  document.getElementById("sourceCandidateCount").textContent = `${candidates.length}개`;
+
+  box.innerHTML = candidates
+    .slice()
+    .sort((a,b) => a.name.localeCompare(b.name, "ko"))
+    .map(r => `
+      <div class="candidate-card">
+        <div class="candidate-card-head">
+          <div>
+            <div class="candidate-card-name">${escapeHtml(r.name)}</div>
+            <div class="candidate-card-parent">${escapeHtml(r.fullName || r.geo?.parent || "")}</div>
+            <span class="candidate-tag ${r.source==="user"?"user":""}">
+              ${r.source==="user" ? "사용자 추가 KCP" : currentIndicator().short + " 기본 KCP"}
+            </span>
+          </div>
+          ${r.source==="user"
+            ? `<button class="candidate-delete-btn" onclick="removeUserCandidate('${escapeHtml(r.name)}')" title="추가한 후보지역 삭제">🗑 후보 삭제</button>`
+            : ""}
+        </div>
+        <div class="candidate-card-grid">
+          <div class="candidate-card-stat">
+            <span>최근 배출량</span><b>${nf.format(r.latestEmission)} tCO₂eq</b>
+          </div>
+          <div class="candidate-card-stat">
+            <span>12개월 평균</span><b>${nf.format(r.mean12)} tCO₂eq</b>
+          </div>
+          <div class="candidate-card-stat">
+            <span>Trend</span><b>${r.trend>0?"+":""}${Number(r.trend).toFixed(2)}</b>
+          </div>
+          <div class="candidate-card-stat">
+            <span>YoY 증가월</span><b>${Number(r.repeatIncrease).toFixed(2)}%</b>
+          </div>
+        </div>
+      </div>
+    `).join("");
+}
+
+function minMaxScores(values) {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  if (max === min) return values.map(() => 0);
+  return values.map(v => (v-min)/(max-min)*100);
+}
+
+function rankedRowsForScenario(scenarioName) {
+  const candidates = allCandidates();
+  if (!candidates.length) return [];
+
+  const logs = candidates.map(r => Math.log1p(Number(r.mean12)));
+  const trends = candidates.map(r => Number(r.trend));
+  const repeats = candidates.map(r => Number(r.repeatIncrease));
+
+  const levelScores = minMaxScores(logs);
+  const trendScores = minMaxScores(trends);
+  const repeatScores = minMaxScores(repeats);
+
+  const enriched = candidates.map((r,i) => ({
+    ...r,
+    levelScore: levelScores[i],
+    trendScore: trendScores[i],
+    repeatScore: repeatScores[i]
+  }));
+
+  const wPct = DATA.scenarios[scenarioName].weights;
+  const w = {
+    level: wPct["배출수준"]/100,
+    trend: wPct["최근추세"]/100,
+    repeat: wPct["반복증가"]/100
+  };
+
+  enriched.forEach(r => {
+    r.score = r.levelScore*w.level + r.trendScore*w.trend + r.repeatScore*w.repeat;
+  });
+
+  const sorted = enriched.slice().sort((a,b)=>b.score-a.score);
+  sorted.forEach((r,i)=>{ r.rank = i+1; });
+
+  // v3와 동일하게 기준 가중치 주변 ±5%p 민감도 분석
+  const rankHistory = Object.fromEntries(sorted.map(r => [r.name, []]));
+  const delta = 0.05;
+  const levelCandidates = [w.level-delta, w.level, w.level+delta];
+  const trendCandidates = [w.trend-delta, w.trend, w.trend+delta];
+
+  levelCandidates.forEach(wLevel => {
+    trendCandidates.forEach(wTrend => {
+      const wRepeat = 1 - wLevel - wTrend;
+      if (wLevel < 0 || wTrend < 0 || wRepeat < 0) return;
+
+      const temp = enriched.map(r => ({
+        name:r.name,
+        score:r.levelScore*wLevel + r.trendScore*wTrend + r.repeatScore*wRepeat
+      })).sort((a,b)=>b.score-a.score);
+
+      temp.forEach((r,i) => rankHistory[r.name].push(i+1));
+    });
+  });
+
+  sorted.forEach(r => {
+    const hist = rankHistory[r.name];
+    r.range = `${Math.min(...hist)} ~ ${Math.max(...hist)}`;
+    r.top3 = hist.filter(v=>v<=3).length / hist.length * 100;
+  });
+
+  return sorted;
+}
+
+function refreshDashboard() {
+  buildTable();
+  buildMap();
+  buildAdvice();
+}
+
+
+function scenarioKeys() { return Object.keys(DATA.scenarios); }
+
+function buildTabs() {
+  const box = document.getElementById("scenarioTabs");
+  box.innerHTML = scenarioKeys().map(key => `
+    <button class="tab ${key===selectedScenario?"active":""}" onclick="setScenario('${key}')">
+      ${DATA.scenarios[key].label}
+    </button>`).join("");
+}
+
+function buildWeights() {
+  const w = DATA.scenarios[selectedScenario].weights;
+  document.getElementById("weights").innerHTML = Object.entries(w)
+    .map(([k,v]) => `<span class="weight">${k} <b>${v}%</b></span>`).join("");
+}
+
+function getRows() { return rankedRowsForScenario(selectedScenario); }
+
+function buildTable() {
+  const rows = getRows();
+  const tbody = document.getElementById("rankingBody");
+
+  if (!rows.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" class="empty-ranking">
+          <b>${currentIndicator().label}</b>에 연결된 후보지역 KCP 데이터가 없습니다.<br>
+          우측 ‘후보 지역 현황’에서 동·읍·면을 검색하면 KCP API 조회와 v3 계산을 거쳐 후보가 자동 추가됩니다.
+        </td>
+      </tr>`;
+
+    document.getElementById("topRegion").textContent = "—";
+    document.getElementById("topScore").textContent =
+      `${DATA.scenarios[selectedScenario].label} · 후보 데이터 없음`;
+    document.getElementById("topStability").textContent = "—";
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => `
+    <tr data-rank="${r.rank}" onclick="openDetail('${r.name}')">
+      <td><span class="rank">${r.rank}</span></td>
+      <td><b>${r.name}</b></td>
+      <td>
+        <div class="scorebar"><div class="bar"><i style="width:${Math.min(r.score,100)}%"></i></div><b>${r.score.toFixed(1)}</b></div>
+      </td>
+      <td>${nf.format(r.latestEmission)} tCO₂eq</td>
+      <td>${nf.format(r.mean12)} tCO₂eq</td>
+      <td class="${r.trend>0?"up":"down"}">${r.trend>0?"+":""}${Number(r.trend).toFixed(2)}</td>
+      <td>${Number(r.repeatIncrease).toFixed(2)}%</td>
+      <td>${r.range}</td>
+      <td class="${r.top3>=75?"stable":""}">${r.top3.toFixed(2)}%</td>
+    </tr>`).join("");
+
+  const top = rows[0];
+  document.getElementById("topRegion").textContent = top.name;
+  document.getElementById("topScore").textContent =
+    `${DATA.scenarios[selectedScenario].label} · ${top.score.toFixed(2)}점`;
+  document.getElementById("topStability").textContent = `${top.top3.toFixed(0)}%`;
+}
+
+let leafletMap = null;
+let candidateLayer = null;
+
+function makeRankIcon(rank) {
+  const cls = rank === 1 ? "rank1" : (rank <= 3 ? "top3" : "");
+  return L.divIcon({
+    className: "leaflet-div-icon",
+    html: `<div class="candidate-pin ${cls}">${rank}</div>`,
+    iconSize: rank === 1 ? [42,42] : [34,34],
+    iconAnchor: rank === 1 ? [21,21] : [17,17],
+    popupAnchor: [0,-18]
+  });
+}
+
+function initRealMap() {
+  if (leafletMap || typeof L === "undefined") return;
+
+  leafletMap = L.map("realMap", {
+    zoomControl: true,
+    scrollWheelZoom: true
+  }).setView([36.15, 127.75], 7);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors'
+  }).addTo(leafletMap);
+
+  candidateLayer = L.layerGroup().addTo(leafletMap);
+}
+
+function buildMap() {
+  initRealMap();
+  if (!leafletMap || !candidateLayer) return;
+
+  candidateLayer.clearLayers();
+
+  const rows = getRows();
+  const bounds = [];
+
+  rows.forEach(r => {
+    if (
+      !r.geo ||
+      !Number.isFinite(Number(r.geo.lat)) ||
+      !Number.isFinite(Number(r.geo.lng))
+    ) {
+      return;
+    }
+
+    const marker = L.marker(
+      [Number(r.geo.lat), Number(r.geo.lng)],
+      {icon: makeRankIcon(r.rank), title: `${r.name} ${r.rank}위`}
+    );
+
+    marker.bindTooltip(
+      `<b>${escapeHtml(r.name)}</b> · 후보 ${r.rank}위`,
+      {direction:"top", offset:[0,-18], opacity:.96}
+    );
+
+    marker.bindPopup(`
+      <div class="popup-title">${escapeHtml(r.name)}</div>
+      <div class="popup-sub">${escapeHtml(r.geo.parent || "")} · 정책 확대 후보</div>
+      <div class="popup-row"><span>현재 시나리오</span><b>${DATA.scenarios[selectedScenario].label}</b></div>
+      <div class="popup-row"><span>우선순위</span><b>${r.rank}위</b></div>
+      <div class="popup-row"><span>점수</span><b>${r.score.toFixed(1)}</b></div>
+      <div class="popup-row"><span>최근 배출량</span><b>${nf.format(r.latestEmission)} tCO₂eq</b></div>
+      <div class="popup-row"><span>Trend</span><b>${r.trend>0?"+":""}${Number(r.trend).toFixed(2)}</b></div>
+      <div class="popup-row"><span>YoY 증가월</span><b>${Number(r.repeatIncrease).toFixed(1)}%</b></div>
+    `);
+
+    marker.addTo(candidateLayer);
+    bounds.push([Number(r.geo.lat), Number(r.geo.lng)]);
+  });
+
+  if (bounds.length) {
+    leafletMap.fitBounds(bounds, {padding:[42,42], maxZoom:8});
+  } else {
+    leafletMap.setView([36.15, 127.75], 7);
+  }
+}
+
+function switchMapPane(type) {
+  const candidate = type === "candidate";
+
+  document.getElementById("candidateMapPane").classList.toggle("active", candidate);
+  document.getElementById("kcpMapPane").classList.toggle("active", !candidate);
+  document.getElementById("candidateMapTab").classList.toggle("active", candidate);
+  document.getElementById("kcpMapTab").classList.toggle("active", !candidate);
+
+  if (candidate) {
+    setTimeout(() => {
+      initRealMap();
+      leafletMap.invalidateSize();
+      buildMap();
+    }, 50);
+  }
+}
+
+function buildAdvice() {
+  document.getElementById("adviceGrid").innerHTML = scenarioKeys().map(key => {
+    const rows = rankedRowsForScenario(key);
+    const s = DATA.scenarios[key];
+
+    if (!rows.length) {
+      return `<article class="advice-card ${key===selectedScenario?"active":""}" onclick="setScenario('${key}')">
+        <span class="badge">${s.label}</span>
+        <h4>후보 데이터 필요</h4>
+        <p>${currentIndicator().label}에 연결된 후보지역을 먼저 추가하면 해당 시나리오의 우선순위와 정책 제언이 자동 생성됩니다.</p>
+      </article>`;
+    }
+
+    const first = rows[0];
+    const second = rows[1];
+
+    let message = "";
+    if (key === "균형형") {
+      message = `${first.name}이 현재 종합 1순위입니다. 배출수준·최근추세·반복증가를 고르게 고려한 결과이며, ${second ? second.name + "이 2순위입니다." : ""}`;
+    } else if (key === "감축잠재량_중시형") {
+      message = `${first.name}이 배출규모를 중시할 때 1순위입니다. 절대적인 감축 여력이 큰 지역을 우선 검토하는 관점에서 ${second ? second.name + "과 함께 비교하는 것이 좋습니다." : "우선 검토할 수 있습니다."}`;
+    } else {
+      message = `${first.name}이 악화 추세를 중시할 때 1순위입니다. 최근 Trend와 반복증가 신호를 중심으로 ${second ? second.name + "도 조기 개입 후보로 함께 검토할 수 있습니다." : "선제 개입 여부를 검토할 수 있습니다."}`;
+    }
+
+    return `<article class="advice-card ${key===selectedScenario?"active":""}" onclick="setScenario('${key}')">
+      <span class="badge">${s.label}</span>
+      <h4>1순위 · ${first.name}</h4>
+      <p>${message}</p>
+    </article>`;
+  }).join("");
+}
+
+function setScenario(key) {
+  selectedScenario = key;
+  buildTabs(); buildWeights(); buildTable(); buildMap(); buildAdvice();
+}
+
+function openDetail(name) {
+  const r = allCandidates().find(x => x.name === name);
+  if (!r) return;
+
+  document.getElementById("detailName").textContent = name;
+  if (document.getElementById("detailParent")) {
+    document.getElementById("detailParent").textContent =
+      `${r.geo.parent || ""} · KCP 지역 상세 및 시나리오별 순위`;
+  }
+  document.getElementById("dLatest").textContent = nf.format(r.latestEmission) + " tCO₂eq";
+  document.getElementById("dMean").textContent = nf.format(r.mean12) + " tCO₂eq";
+  document.getElementById("dTrend").textContent = (r.trend>0?"+":"") + Number(r.trend).toFixed(2);
+  document.getElementById("dRepeat").textContent = Number(r.repeatIncrease).toFixed(2) + "%";
+
+  document.getElementById("detailRanks").innerHTML = scenarioKeys().map(key => {
+    const info = rankedRowsForScenario(key).find(x => x.name === name);
+    return `<div class="rankline"><span>${DATA.scenarios[key].label}</span><b>${info.rank}위 · ${info.score.toFixed(1)}점</b></div>`;
+  }).join("");
+
+  let text = "";
+  if (r.trend > 0 && r.repeatIncrease >= 60) {
+    text = "최근 추세와 반복 증가 신호가 모두 강해 선제대응형에서 우선순위가 높아질 가능성이 큰 후보입니다.";
+  } else if (r.mean12 >= 5000) {
+    text = "최근 배출 추세와 별개로 배출 규모가 큰 후보입니다. 배출수준 비중이 높은 시나리오에서 우선순위를 확인하는 것이 좋습니다.";
+  } else if (r.repeatIncrease >= 40) {
+    text = "반복적인 증가 신호가 상대적으로 눈에 띄는 후보입니다. 조기 개입 목적의 시나리오에서 함께 검토할 수 있습니다.";
+  } else {
+    text = "현재 세 지표에서는 다른 후보와 비교해 우선 신호가 상대적으로 낮을 수 있습니다. 사업 적용 가능성과 추가 정책 여건을 함께 검토하는 것이 좋습니다.";
+  }
+
+  document.getElementById("detailInterpret").textContent = text;
+  document.getElementById("detail").classList.add("open");
+}
+
+function closeDetail() { document.getElementById("detail").classList.remove("open"); }
+
+renderPolicySettings(); renderCandidateRegions(); buildTabs(); buildWeights(); buildTable(); buildMap(); buildAdvice();
+</script>
+</body>
+</html>
